@@ -13,6 +13,7 @@ from .i18n import translate
 from .config import PikaurConfig
 from .args import reconstruct_args, PikaurArgs, parse_args
 from .aur import AURPackageInfo
+from .custom_pkg import get_custom_pkgs, get_custom_pkg_path
 from .pacman import (
     PackageDB,
     get_pacman_command, refresh_pkg_db_if_needed, install_built_deps, strip_repo_name,
@@ -76,6 +77,20 @@ def edit_file(filename: str) -> bool:  # pragma: no cover
     return old_hash != new_hash
 
 
+def refresh_custom_pkg_database():
+    custom_path = get_custom_pkg_path()
+    if custom_path != '':
+        print_stderr(translate('Updating custom package database...'))
+        if os.path.exists(custom_path):
+            for pkg in get_custom_pkgs():
+                print_stdout(pkg.name)
+                pkg.srcinfo.regenerate()
+        else:
+            print_warning(
+                translate("The custom package path '{custom_path}' does not exist.")
+                    .format(custom_path=custom_path)
+            )
+
 class InstallPackagesCLI():
 
     # User input
@@ -122,30 +137,35 @@ class InstallPackagesCLI():
         self.transactions = {}
         self.failed_to_build_package_names = []
 
-        if not self.args.aur and (self.args.sysupgrade or self.args.refresh):
+        if (self.args.sysupgrade or self.args.refresh):
+            if not self.args.aur:
 
-            with ThreadPool() as pool:
-                threads = []
-                if self.args.sysupgrade:
-                    self.news = News()
-                    threads.append(
-                        pool.apply_async(self.news.fetch_latest, ())
-                    )
+                with ThreadPool() as pool:
+                    threads = []
+                    if self.args.sysupgrade:
+                        self.news = News()
+                        threads.append(
+                            pool.apply_async(self.news.fetch_latest, ())
+                        )
+                    if self.args.refresh:
+                        threads.append(
+                            pool.apply_async(refresh_pkg_db_if_needed, ())
+                        )
+                    pool.close()
+                    for thread in threads:
+                        thread.get()
+                    pool.join()
+
                 if self.args.refresh:
-                    threads.append(
-                        pool.apply_async(refresh_pkg_db_if_needed, ())
-                    )
-                pool.close()
-                for thread in threads:
-                    thread.get()
-                pool.join()
+                    PackageDB.discard_repo_cache()
+                    print_stdout()
+
+            if not self.args.repo:
+                refresh_custom_pkg_database()
+                print_stdout()
 
             if not (self.install_package_names or self.args.sysupgrade):
                 return
-
-            if self.args.refresh:
-                PackageDB.discard_repo_cache()
-                print_stdout()
 
         if self.args.sysupgrade and not self.args.repo:
             print_stderr('{} {}'.format(  # pylint: disable=consider-using-f-string
