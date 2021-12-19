@@ -240,6 +240,14 @@ CONFIG_SCHEMA: Dict[str, Any] = {
                 'option': 'NewsUrl',
             },
         },
+        'CustomPackagePath': {
+            'type': 'str',
+            'default': ''
+        },
+        'CustomPackagePrefix': {
+            'type': 'str',
+            'default': 'custom'
+        },
     },
     'network': {
         'AurUrl': {

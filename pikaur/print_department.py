@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, List, Tuple, Iterable, Union, Dict, Optional
 
 import pyalpm
 
+from pikaur.custom_pkg import CustomPackageInfo
+
 from .i18n import translate, translate_many
 from .pprint import (
     print_stderr, color_line, bold_line, format_paragraph, get_term_width,
@@ -532,6 +534,7 @@ def print_ignoring_outofdate_upgrade(package_info: InstallInfo) -> None:
 def print_package_search_results(  # pylint:disable=useless-return,too-many-locals,too-many-statements,too-many-branches
         repo_packages: Iterable[pyalpm.Package],
         aur_packages: Iterable[AURPackageInfo],
+        custom_packages: Iterable[AURPackageInfo],
         local_pkgs_versions: Dict[str, str],
         enumerated=False,
 ) -> List[AnyPackage]:
@@ -580,7 +583,11 @@ def print_package_search_results(  # pylint:disable=useless-return,too-many-loca
         aur_packages,
         key=get_aur_sort_key
     ))
-    sorted_packages: List[AnyPackage] = [*sorted_repo_pkgs, *sorted_aur_pkgs]
+    sorted_custom_pkgs: List[AURPackageInfo] = list(sorted(
+        custom_packages,
+        key=get_aur_sort_key
+    ))
+    sorted_packages: List[AnyPackage] = [*sorted_repo_pkgs, *sorted_aur_pkgs, *sorted_custom_pkgs]
     # mypy is always funny ^^ https://github.com/python/mypy/issues/5492#issuecomment-545992992
 
     enumerated_packages = list(enumerate(sorted_packages))
@@ -601,6 +608,8 @@ def print_package_search_results(  # pylint:disable=useless-return,too-many-loca
             repo = color_line('aur/', 9)
             if isinstance(package, pyalpm.Package):
                 repo = pretty_format_repo_name(package.db.name)
+            elif isinstance(package, CustomPackageInfo):
+                repo = color_line(f'{user_config.misc.CustomPackagePrefix.get_str()}/', 9)
 
             groups = ''
             if getattr(package, 'groups', None):
