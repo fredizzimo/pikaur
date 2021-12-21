@@ -8,6 +8,14 @@ from .aur import AURPackageInfo
 
 
 class CustomPackageInfo(AURPackageInfo):
+    @property
+    def repository(self) -> str:
+        return PikaurConfig().misc.CustomPackagePrefix.get_str()
+
+    @property
+    def git_url(self):
+        return None
+
     @classmethod
     def from_srcinfo(cls, srcinfo) -> 'CustomPackageInfo':
         return cast(CustomPackageInfo, super().from_srcinfo(srcinfo))
@@ -37,23 +45,31 @@ def get_custom_pkgs():
     return ret
 
 
-def custom_pkg_search_name_desc(queries: List[str]) -> Dict[str, List[CustomPackageInfo]]:
+def get_custom_package_infos() -> Dict[str, CustomPackageInfo]:
     pkgs = get_custom_pkgs()
+    results = {}
+    for pkg in pkgs:
+        base_srcinfo = pkg.srcinfo
+        for name in base_srcinfo.pkgnames:
+            srcinfo = SrcInfo(
+                pkgbuild_path=pkg.pkgbuild_path,
+                package_name=name)
+            results[name] = CustomPackageInfo.from_srcinfo(srcinfo)
+
+    return results
+
+
+def custom_pkg_search_name_desc(queries: List[str]) -> Dict[str, List[CustomPackageInfo]]:
+    pkgs = get_custom_package_infos().values()
     if queries:
         results = {}
         for query in queries:
             for pkg in pkgs:
-                base_srcinfo = pkg.srcinfo
-                for name in base_srcinfo.pkgnames:
-                    srcinfo = SrcInfo(
-                        pkgbuild_path=pkg.pkgbuild_path,
-                        package_name=name)
-                    descs = srcinfo.get_values('pkgdesc')
-                    desc = " ".join(descs)
-                    if query in name or query in desc:
-                        results.setdefault(query, []).append(
-                            CustomPackageInfo.from_srcinfo(srcinfo))
+                name = pkg.name if pkg.name is not None else ''
+                desc = pkg.desc if pkg.desc is not None else ''
+                if query in name or query in desc:
+                    results.setdefault(query, []).append(pkg)
     else:
-        results = {'all': [CustomPackageInfo.from_srcinfo(pkg.srcinfo) for pkg in pkgs]}
+        results = {'all': list(pkgs)}
 
     return results

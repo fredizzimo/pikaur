@@ -10,12 +10,15 @@ from .exceptions import AURError
 from .progressbar import ThreadSafeProgressBar
 from .config import PikaurConfig
 from .urllib import get_gzip_from_url, get_json_from_url
+from . import custom_pkg # pylint: disable=cyclic-import
 
 
 AUR_BASE_URL = PikaurConfig().network.AurUrl.get_str()
 
 
 class AURPackageInfo(DataType):
+    repository = 'AUR'
+
     packagebase: str
     name: str
     version: str
@@ -42,9 +45,11 @@ class AURPackageInfo(DataType):
     keywords: List[str] = []
     groups: List[str] = []
 
+
     @property
     def git_url(self) -> str:
         return f'{AUR_BASE_URL}/{self.packagebase}.git'
+
 
     def __init__(self, **kwargs) -> None:
         if 'description' in kwargs:
@@ -68,6 +73,7 @@ class AURPackageInfo(DataType):
                     'conflicts',
                     'replaces',
                     'provides',
+                    'license',
                 ]
             }
         )
@@ -157,10 +163,13 @@ def find_aur_packages(
     package_names = [strip_aur_repo_name(name) for name in package_names]
     num_packages = len(package_names)
     json_results = []
+    custom_pkgs = custom_pkg.get_custom_package_infos()
     for package_name in package_names[:]:
-        aur_pkg = _AUR_PKGS_FIND_CACHE.get(package_name)
-        if aur_pkg:
-            json_results.append(aur_pkg)
+        pkg = custom_pkgs.get(package_name)
+        if not pkg:
+            pkg = _AUR_PKGS_FIND_CACHE.get(package_name)
+        if pkg:
+            json_results.append(pkg)
             package_names.remove(package_name)
 
     if package_names:
