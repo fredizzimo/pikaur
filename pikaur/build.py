@@ -41,6 +41,7 @@ from .version import compare_versions, VersionMatcher
 from .makepkg_config import MakepkgConfig, MakePkgCommand, PKGDEST
 from .urllib import wrap_proxy_env
 from .filelock import FileLock
+from .custom_pkg import CustomPackageInfo
 
 
 BUILD_DEPS_LOCK = '/tmp/pikaur_build_deps.lock'
@@ -789,16 +790,16 @@ class PackageBuild(DataType):  # pylint: disable=too-many-public-methods
 def clone_aur_repos(package_names: List[str]) -> Dict[str, PackageBuild]:
     aur_pkgs, _ = find_aur_packages(package_names)
     packages_bases: Dict[str, List[str]] = {}
-    for aur_pkg in aur_pkgs:
-        packages_bases.setdefault(aur_pkg.packagebase, []).append(aur_pkg.name)
+    custom_packages_bases: Dict[str, List[CustomPackageInfo]] = {}
+    for custom_pkg in (pkg for pkg in aur_pkgs if isinstance(pkg, CustomPackageInfo)):
+        custom_packages_bases.setdefault(custom_pkg.packagebase, []).append(custom_pkg)
+    for aur_pkg in (pkg for pkg in aur_pkgs if not isinstance(pkg, CustomPackageInfo)):
+        # Todo: add error handling here
+        if aur_pkg.packagebase not in custom_packages_bases:
+            packages_bases.setdefault(aur_pkg.packagebase, []).append(aur_pkg.name)
     package_builds_by_base = {
-        pkgbase: PackageBuild(pkg_names)
-        for pkgbase, pkg_names in packages_bases.items()
-    }
-    package_builds_by_name = {
-        pkg_name: package_builds_by_base[pkgbase]
-        for pkgbase, pkg_names in packages_bases.items()
-        for pkg_name in pkg_names
+            pkgbase: PackageBuild(pkg_names)
+            for pkgbase, pkg_names in packages_bases.items()
     }
     pool_size: Optional[int] = None
     if running_as_root():
@@ -817,4 +818,19 @@ def clone_aur_repos(package_names: List[str]) -> Dict[str, PackageBuild]:
                     build=package_builds_by_base[package_base],
                     result=result
                 )
+
+    package_builds_by_name = {
+        **{
+        pkg_name: package_builds_by_base[pkgbase]
+        for pkgbase, pkg_names in packages_bases.items()
+        for pkg_name in pkg_names
+        },
+        **{
+            pkginfo.name: PackageBuild(
+                pkgbuild_path=pkginfo.pkgbuild_path)
+            for _, pkginfos in custom_packages_bases.items()
+            for pkginfo in pkginfos
+        }
+    }
+
     return package_builds_by_name

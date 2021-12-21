@@ -57,7 +57,7 @@ class AURPackageInfo(DataType):
         super().__init__(**kwargs)
 
     @classmethod
-    def from_srcinfo(cls, srcinfo) -> 'AURPackageInfo':
+    def from_srcinfo(cls, srcinfo, **kwargs) -> 'AURPackageInfo':
         return cls(
             name=srcinfo.package_name,
             version=srcinfo.get_value('pkgver') + '-' + srcinfo.get_value('pkgrel'),
@@ -75,7 +75,8 @@ class AURPackageInfo(DataType):
                     'provides',
                     'license',
                 ]
-            }
+            },
+            **kwargs
         )
 
     def __repr__(self) -> str:
