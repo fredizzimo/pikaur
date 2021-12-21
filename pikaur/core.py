@@ -62,17 +62,27 @@ class DataType(ComparableType):
     def __init__(self, **kwargs) -> None:
         for key, value in kwargs.items():
             setattr(self, key, value)
-        for key in self.__annotations__:  # pylint: disable=no-member
+        for key in self.get_annotations():
             if self._key_not_exists(key):
                 raise TypeError(
                     f"'{self.__class__.__name__}' does "
                     f"not have required attribute '{key}' set"
                 )
 
+    @classmethod
+    def get_annotations(cls):
+        annotations = {}
+        for c in cls.mro():
+            try:
+                annotations.update(**c.__annotations__) # pylint: disable=no-member
+            except AttributeError:
+                pass
+        return annotations
+
     def __setattr__(self, key: str, value: Any) -> None:
         if (
                 not getattr(self, "__annotations__", None) or
-                self.__annotations__.get(key, NOT_FOUND_ATOM) is NOT_FOUND_ATOM  # pylint: disable=no-member
+                self.get_annotations().get(key, NOT_FOUND_ATOM) is NOT_FOUND_ATOM
         ) and self._key_not_exists(key):
             raise TypeError(
                 f"'{self.__class__.__name__}' does "

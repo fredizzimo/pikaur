@@ -7,7 +7,16 @@ from .srcinfo import SrcInfo
 from .aur import AURPackageInfo
 
 
+class CustomPackage:
+    def __init__(self, custom_path: str, name: str):
+        self.name = name
+        self.pkgbuild_path = path.join(custom_path, name, 'PKGBUILD')
+        self.srcinfo = SrcInfo(pkgbuild_path=self.pkgbuild_path)
+
+
 class CustomPackageInfo(AURPackageInfo):
+    pkgbuild_path: str
+
     @property
     def repository(self) -> str:
         return PikaurConfig().misc.CustomPackagePrefix.get_str()
@@ -17,15 +26,12 @@ class CustomPackageInfo(AURPackageInfo):
         return None
 
     @classmethod
-    def from_srcinfo(cls, srcinfo) -> 'CustomPackageInfo':
-        return cast(CustomPackageInfo, super().from_srcinfo(srcinfo))
-
-
-class CustomPackage:
-    def __init__(self, custom_path: str, name: str):
-        self.name = name
-        self.pkgbuild_path = path.join(custom_path, name, 'PKGBUILD')
-        self.srcinfo = SrcInfo(pkgbuild_path=self.pkgbuild_path)
+    def from_srcinfo(cls, srcinfo: SrcInfo, **kwargs) -> 'CustomPackageInfo':
+        ret = cast(CustomPackageInfo, super().from_srcinfo(
+            srcinfo,
+            pkgbuild_path=srcinfo.pkgbuild_path
+        ))
+        return ret
 
 
 def get_custom_pkg_path():
