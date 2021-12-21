@@ -19,6 +19,7 @@ def _info_packages_thread_repo() -> str:
 
 
 INFO_FIELDS = dict(
+    repository=translate("Repository"),
     git_url=translate("AUR Git URL"),
     # id=translate("id"),
     name=translate("Name"),
