@@ -243,7 +243,11 @@ CONFIG_SCHEMA: Dict[str, Any] = {
         'CustomPackagePath': {
             'type': 'str',
             'default': ''
-        }
+        },
+        'CustomPackagePrefix': {
+            'type': 'str',
+            'default': 'custom'
+        },
     },
     'network': {
         'AurUrl': {

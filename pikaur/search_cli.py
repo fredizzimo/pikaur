@@ -14,6 +14,7 @@ from .aur import (
     AURPackageInfo,
     aur_rpc_search_name_desc, get_all_aur_packages, get_all_aur_names,
 )
+from .custom_pkg import custom_pkg_search_name_desc
 from .args import parse_args
 from .exceptions import AURError, SysExit
 
@@ -101,6 +102,14 @@ def package_search_thread_aur(queries: List[str]) -> Dict[str, List[Any]]:  # py
     return result
 
 
+def package_search_thread_custom(queries: List[str]) -> Dict[str, List[Any]]:  # pylint: disable=too-many-branches
+    args = parse_args()
+    result = custom_pkg_search_name_desc(queries)
+    if not args.quiet:
+        sys.stderr.write('#')
+    return result
+
+
 def package_search_thread_local() -> Dict[str, str]:
     result = {
         pkg_name: pkg.version
@@ -137,7 +146,7 @@ def cli_search_packages(enumerated=False) -> List[AnyPackage]:  # pylint: disabl
     AUR_ONLY = args.aur  # pylint: disable=invalid-name
 
     if not args.quiet:
-        progressbar_length = max(len(search_query), 1) + (not REPO_ONLY) + (not AUR_ONLY)
+        progressbar_length = max(len(search_query), 1) + (not REPO_ONLY) + 2 * (not AUR_ONLY)
         print_stderr(translate("Searching... [{bar}]").format(bar='-' * progressbar_length), end='')
         print_stderr('\x1b[1D' * (progressbar_length + 1), end='')
 
@@ -149,6 +158,9 @@ def cli_search_packages(enumerated=False) -> List[AnyPackage]:  # pylint: disabl
         ] if not AUR_ONLY else []
         request_aur = pool.apply_async(
             package_search_thread_aur, (search_query,)
+        ) if not REPO_ONLY else None
+        request_custom = pool.apply_async(
+            package_search_thread_custom, (search_query,)
         ) if not REPO_ONLY else None
         pool.close()
 
@@ -163,6 +175,7 @@ def cli_search_packages(enumerated=False) -> List[AnyPackage]:  # pylint: disabl
         except AURError as exc:
             print_stderr(f'translate("AUR returned error:") {exc}')
             raise SysExit(121) from exc
+        result_custom = request_custom.get() if request_custom else None
         pool.join()
 
     if not args.quiet:
@@ -174,10 +187,14 @@ def cli_search_packages(enumerated=False) -> List[AnyPackage]:  # pylint: disabl
     aur_result = (
         join_search_results(list(result_aur.values()))
     ) if result_aur and not REPO_ONLY else []
+    custom_result = (
+        join_search_results(list(result_custom.values()))
+    ) if result_custom and not REPO_ONLY else []
 
     return print_package_search_results(
         repo_packages=repo_result,
         aur_packages=aur_result,
+        custom_packages=custom_result,
         local_pkgs_versions=result_local,
         enumerated=enumerated,
     )
